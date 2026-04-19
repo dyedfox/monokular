@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Eye/lens hybrid -->
+  <circle cx="32" cy="32" r="26" fill="#eceff1"/>
+  <circle cx="32" cy="32" r="20" fill="none" stroke="#37474f" stroke-width="4"/>
+  <circle cx="32" cy="32" r="10" fill="#1565c0" opacity="0.8"/>
+  <circle cx="32" cy="32" r="5" fill="#0d47a1"/>
+  <circle cx="29" cy="29" r="3" fill="white" opacity="0.6"/>
+</svg>
