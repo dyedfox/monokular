@@ -93,7 +93,7 @@ class ExportDialog(QDialog):
 
         for idx in self._selected:
             img = self._renderer.render_page_at_ppi(idx, ppi)
-            filename = f"{base}_page{idx + 1}.{ext}"
+            filename = f"{base}_page_{idx + 1}.{ext}"
             filepath = os.path.join(out_dir, filename)
             img.save(filepath, fmt.upper(), quality)
 

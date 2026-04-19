@@ -49,6 +49,21 @@ class MainWindow(QMainWindow):
         self._export_action.triggered.connect(self._export)
         self._export_action.setEnabled(False)
 
+        toolbar.addSeparator()
+
+        self._zoom_out_action = toolbar.addAction("🔍−")
+        self._zoom_out_action.setToolTip("Smaller thumbnails")
+        self._zoom_out_action.triggered.connect(self._thumb_zoom_out)
+
+        self._zoom_label = QLabel(f" {ThumbnailGrid.THUMB_SIZES.index(180) + 1}/{len(ThumbnailGrid.THUMB_SIZES)} ")
+        toolbar.addWidget(self._zoom_label)
+
+        self._zoom_in_action = toolbar.addAction("🔍+")
+        self._zoom_in_action.setToolTip("Larger thumbnails")
+        self._zoom_in_action.triggered.connect(self._thumb_zoom_in)
+
+        self._thumb_size_idx = ThumbnailGrid.THUMB_SIZES.index(180)
+
         # Central: stack with placeholder and grid
         self._stack = QStackedWidget()
 
@@ -134,3 +149,21 @@ class MainWindow(QMainWindow):
         if self._renderer:
             dialog = PreviewDialog(self._renderer, index, self)
             dialog.exec()
+
+    def _thumb_zoom_in(self):
+        sizes = ThumbnailGrid.THUMB_SIZES
+        if self._thumb_size_idx < len(sizes) - 1:
+            self._thumb_size_idx += 1
+            self._grid.thumb_width = sizes[self._thumb_size_idx]
+            self._update_zoom_label()
+
+    def _thumb_zoom_out(self):
+        sizes = ThumbnailGrid.THUMB_SIZES
+        if self._thumb_size_idx > 0:
+            self._thumb_size_idx -= 1
+            self._grid.thumb_width = sizes[self._thumb_size_idx]
+            self._update_zoom_label()
+
+    def _update_zoom_label(self):
+        sizes = ThumbnailGrid.THUMB_SIZES
+        self._zoom_label.setText(f" {self._thumb_size_idx + 1}/{len(sizes)} ")

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Monokular
+Comment=Export PDF pages as images
+Exec=python3 /home/yaroslav/Documents/my_projects/monokular/main.py
+Icon=/home/yaroslav/Documents/my_projects/monokular/assets/icon.svg
+Terminal=false
+Type=Application
+Categories=Utility;Graphics;
+MimeType=application/pdf;
