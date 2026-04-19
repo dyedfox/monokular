@@ -14,6 +14,14 @@ def main():
     app.setWindowIcon(QIcon(ICON_PATH))
     window = MainWindow()
     window.show()
+
+    # Open PDF passed as command-line argument (e.g. "Open With" from file manager)
+    args = app.arguments()[1:]
+    for arg in args:
+        if arg.lower().endswith(".pdf") and os.path.isfile(arg):
+            window._load_pdf(arg)
+            break
+
     sys.exit(app.exec())
 
 
