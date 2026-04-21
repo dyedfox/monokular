@@ -120,7 +120,19 @@ class ThumbnailGrid(QScrollArea):
         self._cards: list[ThumbCard] = []
         self._renderer: PdfRenderer | None = None
         self._thumb_width = DEFAULT_THUMB_WIDTH
+        self._min_columns = MIN_COLUMNS
         self._selected_set: set[int] = set()
+
+    @property
+    def min_columns(self) -> int:
+        return self._min_columns
+
+    @min_columns.setter
+    def min_columns(self, value: int):
+        if value != self._min_columns:
+            self._min_columns = value
+            if self._renderer:
+                self._relayout(self._calc_columns())
 
     @property
     def thumb_width(self) -> int:
@@ -162,7 +174,7 @@ class ThumbnailGrid(QScrollArea):
     def _calc_columns(self) -> int:
         available = self.viewport().width() - SPACING
         card_w = self._thumb_width + CARD_PADDING + SPACING
-        cols = max(MIN_COLUMNS, available // card_w) if card_w > 0 else MIN_COLUMNS
+        cols = max(self._min_columns, available // card_w) if card_w > 0 else self._min_columns
         return cols
 
     def resizeEvent(self, event):
@@ -178,7 +190,7 @@ class ThumbnailGrid(QScrollArea):
                     r0, c0, _, _ = self._grid.getItemPosition(pos0)
                     r1, c1, _, _ = self._grid.getItemPosition(pos1)
                     if r0 == r1:
-                        current_cols = c1 - c0 + 1 if c1 > c0 else MIN_COLUMNS
+                        current_cols = c1 - c0 + 1 if c1 > c0 else self._min_columns
             if new_cols != current_cols:
                 self._relayout(new_cols)
 
