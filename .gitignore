@@ -20,3 +20,6 @@ env/
 *.tar.gz
 pkg/
 src/
+
+# AUR artifacts
+PKGBUILD.old
