@@ -15,11 +15,6 @@ makedepends=('git')
 source=("$pkgname-$pkgver::git+${url}.git#tag=v${pkgver}")
 sha256sums=('SKIP')
 
-pkgver() {
-    cd "$pkgname-$pkgver"
-    git describe --tags --long | sed 's/^v//;s/-/.r/;s/-/./'
-}
-
 package() {
     cd "$srcdir/$pkgname-$pkgver"
 
