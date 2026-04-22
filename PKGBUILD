@@ -1,7 +1,7 @@
 # Maintainer: Yaroslav Krytsun <slavko7 at gmail dot com>
 pkgname=monokular
 pkgver=1.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Export PDF pages as images with preview — one thing, done well"
 arch=('any')
 url="https://github.com/dyedfox/monokular"

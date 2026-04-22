@@ -18,6 +18,7 @@ from app.preview_dialog import PreviewDialog
 from app.settings import Settings
 from app.settings_dialog import SettingsDialog
 from app.thumbnail_grid import ThumbnailGrid
+from app.version import __version__
 
 
 class MainWindow(QMainWindow):
@@ -87,10 +88,13 @@ class MainWindow(QMainWindow):
         settings_action = toolbar.addAction("Settings")
         settings_action.triggered.connect(self._open_settings)
 
+        about_action = toolbar.addAction("About")
+        about_action.triggered.connect(self._show_about)
+
         # Central: stack with placeholder and grid
         self._stack = QStackedWidget()
 
-        self._placeholder = QLabel("Open a PDF or drag && drop one here")
+        self._placeholder = QLabel("Open a PDF or drag & drop one here")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setStyleSheet("font-size: 18px; color: #888;")
 
@@ -220,3 +224,12 @@ class MainWindow(QMainWindow):
                 self._grid.thumb_width = new_size
                 self._update_zoom_label()
             self._grid.min_columns = self._settings.get("thumbnails/min_columns")
+
+    def _show_about(self):
+        QMessageBox.about(
+            self,
+            "About Monokular",
+            f"<h3>Monokular v{__version__}</h3>"
+            "<p>Export PDF pages as images — one thing, done well.</p>"
+            "<p>License: GPL-3.0-or-later</p>",
+        )
