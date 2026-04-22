@@ -5,6 +5,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QSizePolicy,
     QStackedWidget,
     QToolBar,
     QVBoxLayout,
@@ -14,6 +15,8 @@ from PyQt6.QtWidgets import (
 from app.export_dialog import ExportDialog
 from app.pdf_renderer import PdfRenderer
 from app.preview_dialog import PreviewDialog
+from app.settings import Settings
+from app.settings_dialog import SettingsDialog
 from app.thumbnail_grid import ThumbnailGrid
 
 
@@ -25,6 +28,7 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
 
         self._renderer: PdfRenderer | None = None
+        self._settings = Settings()
 
         # Toolbar
         toolbar = QToolBar("Main")
@@ -63,7 +67,25 @@ class MainWindow(QMainWindow):
         self._zoom_in_action.setToolTip("Larger thumbnails")
         self._zoom_in_action.triggered.connect(self._thumb_zoom_in)
 
-        self._thumb_size_idx = ThumbnailGrid.THUMB_SIZES.index(180)
+        # Apply saved thumbnail size
+        saved_size = self._settings.get("thumbnails/default_size")
+        if saved_size in ThumbnailGrid.THUMB_SIZES:
+            self._thumb_size_idx = ThumbnailGrid.THUMB_SIZES.index(saved_size)
+        else:
+            self._thumb_size_idx = ThumbnailGrid.THUMB_SIZES.index(180)
+        self._grid = ThumbnailGrid()
+        self._grid.thumb_width = ThumbnailGrid.THUMB_SIZES[self._thumb_size_idx]
+        self._grid.min_columns = self._settings.get("thumbnails/min_columns")
+        self._update_zoom_label()
+
+        toolbar.addSeparator()
+
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        toolbar.addWidget(spacer)
+
+        settings_action = toolbar.addAction("Settings")
+        settings_action.triggered.connect(self._open_settings)
 
         # Central: stack with placeholder and grid
         self._stack = QStackedWidget()
@@ -71,8 +93,6 @@ class MainWindow(QMainWindow):
         self._placeholder = QLabel("Open a PDF or drag && drop one here")
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setStyleSheet("font-size: 18px; color: #888;")
-
-        self._grid = ThumbnailGrid()
 
         self._stack.addWidget(self._placeholder)
         self._stack.addWidget(self._grid)
@@ -102,19 +122,26 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def _open_file(self):
+        start_dir = ""
+        if self._settings.get("general/remember_last_dir"):
+            start_dir = self._settings.get("general/last_open_dir")
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open PDF", "", "PDF Files (*.pdf)"
+            self, "Open PDF", start_dir, "PDF Files (*.pdf)"
         )
         if not path:
             return
         self._load_pdf(path)
 
     def _load_pdf(self, path: str):
+        import os
         if self._renderer:
             self._renderer.close()
 
         self._renderer = PdfRenderer(path)
         self.setWindowTitle(f"Monokular — {path.split('/')[-1]}")
+
+        if self._settings.get("general/remember_last_dir"):
+            self._settings.set("general/last_open_dir", os.path.dirname(path))
 
         self._grid.load(self._renderer)
         self._stack.setCurrentWidget(self._grid)
@@ -157,7 +184,7 @@ class MainWindow(QMainWindow):
         if not selected:
             QMessageBox.information(self, "Export", "No pages selected.")
             return
-        dialog = ExportDialog(self._renderer, selected, self)
+        dialog = ExportDialog(self._renderer, selected, self._settings, self)
         dialog.exec()
 
     def _preview_page(self, index: int):
@@ -182,3 +209,14 @@ class MainWindow(QMainWindow):
     def _update_zoom_label(self):
         sizes = ThumbnailGrid.THUMB_SIZES
         self._zoom_label.setText(f" {self._thumb_size_idx + 1}/{len(sizes)} ")
+
+    def _open_settings(self):
+        dialog = SettingsDialog(self._settings, self)
+        if dialog.exec():
+            # Apply changed settings
+            new_size = self._settings.get("thumbnails/default_size")
+            if new_size in ThumbnailGrid.THUMB_SIZES:
+                self._thumb_size_idx = ThumbnailGrid.THUMB_SIZES.index(new_size)
+                self._grid.thumb_width = new_size
+                self._update_zoom_label()
+            self._grid.min_columns = self._settings.get("thumbnails/min_columns")

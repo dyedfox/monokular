@@ -3,12 +3,12 @@
 pkgname = monokular
 pkgbase = monokular
 xdata = pkgtype=pkg
-pkgver = 1.0.0-1
+pkgver = 1.0.0-5
 pkgdesc = Export PDF pages as images with preview — one thing, done well
 url = 
-builddate = 1776621486
+builddate = 1776791011
 packager = Unknown Packager
-size = 22780
+size = 34304
 arch = any
 license = MIT
 depend = python

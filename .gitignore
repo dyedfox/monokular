@@ -15,5 +15,11 @@ env/
 *.swp
 *.swo
 *~
-dist/
-build/
+# Arch build artifacts
+*.pkg.tar.zst
+*.tar.gz
+pkg/
+src/
+
+# AUR artifacts
+PKGBUILD.old
