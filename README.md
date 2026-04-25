@@ -2,6 +2,20 @@
 
 Monokular — because it does one thing and does it well: export PDF pages as images with a preview option.
 
+## Screenshots
+
+Select pages from a thumbnail grid and export them as images.
+
+![Main window](screenshots/main.png)
+
+Zoom into any page with a full-size preview.
+
+![Page preview](screenshots/preview.png)
+
+Configure export format, quality, PPI, naming, and more.
+
+![Settings](screenshots/settings.png)
+
 ## Features
 
 - Open PDF files via toolbar, drag & drop, or command line
