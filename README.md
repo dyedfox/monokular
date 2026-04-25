@@ -38,7 +38,21 @@ pyinstaller monokular.spec
 
 The binary will be at `dist/monokular`.
 
-## Install on Arch Linux (PKGBUILD)
+## Install on Arch Linux (AUR)
+
+```bash
+yay -S monokular
+```
+
+Or manually:
+
+```bash
+git clone https://aur.archlinux.org/monokular.git
+cd monokular
+makepkg -si
+```
+
+## Build from source (PKGBUILD)
 
 1. Create a source tarball:
 
