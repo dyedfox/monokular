@@ -2,6 +2,18 @@
 
 Monokular — because it does one thing and does it well: export PDF pages as images with a preview option.
 
+## Contents
+
+- [Screenshots](#screenshots)
+- [Features](#features)
+- [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Usage (local)](#usage-local)
+- [Build a standalone binary (PyInstaller)](#build-a-standalone-binary-pyinstaller)
+- [Install on Arch Linux (AUR)](#install-on-arch-linux-aur)
+- [Build from source (PKGBUILD)](#build-from-source-pkgbuild)
+- [Linux desktop integration (manual)](#linux-desktop-integration-manual)
+- [Requirements](#requirements)
+
 ## Screenshots
 
 Select pages from a thumbnail grid and export them as images.
