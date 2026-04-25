@@ -91,7 +91,7 @@ class ThumbCard(QFrame):
     def _update_style(self):
         if self.selected:
             self.setStyleSheet(
-                "ThumbCard { border: 3px solid #2979ff; border-radius: 6px; background: #e3f2fd; }"
+                "ThumbCard { border: 3px solid #2979ff; border-radius: 6px; background: #90caf9; }"
             )
         else:
             self.setStyleSheet(

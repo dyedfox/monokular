@@ -51,7 +51,7 @@ class SettingsDialog(QDialog):
         fixed_row = QHBoxLayout()
         self._fixed_path = QLineEdit()
         self._fixed_path.setText(settings.get("export/fixed_path"))
-        self._fixed_path.setReadOnly(True)
+        self._fixed_path.setPlaceholderText("Type or browse for a folder...")
         self._fixed_browse = QPushButton("Browse...")
         self._fixed_browse.clicked.connect(self._browse_fixed)
         fixed_row.addWidget(self._fixed_path)
