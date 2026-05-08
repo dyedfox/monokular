@@ -193,8 +193,16 @@ class MainWindow(QMainWindow):
 
     def _preview_page(self, index: int):
         if self._renderer:
-            dialog = PreviewDialog(self._renderer, index, self)
+            selected = set(self._grid.selected_indices())
+            dialog = PreviewDialog(self._renderer, index, selected, self)
+            dialog.selection_toggled.connect(self._on_preview_selection_toggled)
             dialog.exec()
+
+    def _on_preview_selection_toggled(self, page_index: int, selected: bool):
+        """Sync selection change from preview dialog back to the thumbnail grid."""
+        if 0 <= page_index < len(self._grid._cards):
+            self._grid._cards[page_index].set_selected(selected)
+            self._grid.selection_changed.emit()
 
     def _thumb_zoom_in(self):
         sizes = ThumbnailGrid.THUMB_SIZES
