@@ -11,10 +11,17 @@ depends=(
     'python-pyqt6'
     'python-pymupdf'
 )
-makedepends=('git')
+makedepends=('git' 'qt6-tools')
 optdepends=('qt6-imageformats: WEBP and TIFF export')
 source=("$pkgname-$pkgver::git+${url}.git#tag=v${pkgver}")
 sha256sums=('SKIP')
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    for ts in translations/*.ts; do
+        lrelease6 "$ts"
+    done
+}
 
 package() {
     cd "$srcdir/$pkgname-$pkgver"
@@ -25,7 +32,9 @@ package() {
 
     # Install compiled translations
     install -dm755 "$pkgdir/usr/lib/$pkgname/translations"
-    install -m644 translations/*.qm "$pkgdir/usr/lib/$pkgname/translations/"
+    for qm in translations/*.qm; do
+        [ -f "$qm" ] && install -m644 "$qm" "$pkgdir/usr/lib/$pkgname/translations/"
+    done
 
     # Install icon
     install -Dm644 assets/icon.svg \

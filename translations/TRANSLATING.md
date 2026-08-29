@@ -1,8 +1,10 @@
 # Translating Monokular
 
 Translations use the Qt Linguist format (`.ts` for sources, `.qm` for the
-compiled catalogues the app loads). Both are committed, so building or
-installing Monokular never requires Qt's development tools.
+compiled catalogues the app loads). Both are committed, so Monokular runs
+from a source checkout without Qt's development tools. The Arch package
+recompiles the `.qm` from the `.ts` at build time (`qt6-tools` is a
+makedepend), so the shipped catalogues always match the sources in the tag.
 
 ## Adding a new language
 

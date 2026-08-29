@@ -135,3 +135,17 @@ def test_a_stray_translations_folder_in_the_working_directory_is_ignored(tmp_pat
 
     assert i18n.translations_dir() != str(decoy)
     assert os.path.isfile(os.path.join(i18n.translations_dir(), "monokular_uk.qm"))
+
+
+def test_the_package_build_compiles_catalogues_from_source():
+    """The Arch package must regenerate .qm from .ts, not ship stale ones."""
+    pkgbuild = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "PKGBUILD"
+    )
+    with open(pkgbuild) as fh:
+        text = fh.read()
+
+    assert "qt6-tools" in text, "qt6-tools must be a makedepend for lrelease6"
+    assert "lrelease6" in text, "build() must compile the catalogues"
+    assert "translations/*.ts" in text, "build() must read the .ts sources"
+    assert "/translations" in text, "package() must install the catalogues"
