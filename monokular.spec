@@ -11,6 +11,7 @@ a = Analysis(
     binaries=[],
     datas=[
         (os.path.join(root, 'assets', 'icon.svg'), 'assets'),
+        (os.path.join(root, 'translations', '*.qm'), 'translations'),
     ],
     hiddenimports=[],
     hookspath=[],

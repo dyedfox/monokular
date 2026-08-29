@@ -4,15 +4,21 @@ import sys
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication
 
+from app import i18n
 from app.main_window import MainWindow
 
 def _find_icon():
     """Resolve icon path for PyInstaller, system install, or local dev."""
-    candidates = [
-        os.path.join(getattr(sys, '_MEIPASS', ''), "assets", "icon.svg"),
-        os.path.join(os.path.dirname(__file__), "assets", "icon.svg"),
-        "/usr/share/icons/hicolor/scalable/apps/monokular.svg",
-    ]
+    candidates = []
+    # Only inside a PyInstaller bundle; otherwise _MEIPASS is absent and
+    # joining "" would yield a relative path resolved against the cwd.
+    bundle = getattr(sys, '_MEIPASS', '')
+    if bundle:
+        candidates.append(os.path.join(bundle, "assets", "icon.svg"))
+    candidates.append(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "icon.svg")
+    )
+    candidates.append("/usr/share/icons/hicolor/scalable/apps/monokular.svg")
     for path in candidates:
         if os.path.isfile(path):
             return path
@@ -27,6 +33,8 @@ def main():
     app.setApplicationName("Monokular")
     app.setDesktopFileName("monokular")
     app.setWindowIcon(QIcon(ICON_PATH))
+    i18n.install_translator(app)
+
     window = MainWindow()
     window.show()
 
