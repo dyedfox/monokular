@@ -17,6 +17,8 @@ DEFAULT_THUMB_WIDTH = 180
 MIN_COLUMNS = 4
 SPACING = 10
 CARD_PADDING = 16
+TOP_BUTTON_SIZE = 40
+TOP_BUTTON_MARGIN = 16
 
 
 class ThumbCard(QFrame):
@@ -26,11 +28,9 @@ class ThumbCard(QFrame):
         super().__init__(parent)
         self.index = index
         self.selected = False
+        self._thumb_width = thumb_width
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        card_width = thumb_width + CARD_PADDING
-        card_height = int(pixmap.height() * (thumb_width / pixmap.width())) + 46
-        self.setFixedSize(card_width, card_height)
+        self._fit_to(pixmap)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -41,7 +41,7 @@ class ThumbCard(QFrame):
         self._image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._image)
 
-        self._label = QLabel(f"Page {index + 1}")
+        self._label = QLabel(self.tr("Page {0}").format(index + 1))
         self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._label.setStyleSheet("font-size: 11px; color: #555;")
 
@@ -49,8 +49,8 @@ class ThumbCard(QFrame):
         bottom_row.setContentsMargins(0, 0, 0, 0)
         bottom_row.addWidget(self._label, stretch=1)
 
-        self._preview_btn = QPushButton("Preview")
-        self._preview_btn.setToolTip("Preview this page")
+        self._preview_btn = QPushButton(self.tr("Preview"))
+        self._preview_btn.setToolTip(self.tr("Preview this page"))
         self._preview_btn.setFixedHeight(22)
         self._preview_btn.setStyleSheet("font-size: 10px;")
         self._preview_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -60,6 +60,16 @@ class ThumbCard(QFrame):
         layout.addLayout(bottom_row)
 
         self._update_style()
+
+    def _fit_to(self, pixmap: QPixmap):
+        card_width = self._thumb_width + CARD_PADDING
+        card_height = int(pixmap.height() * (self._thumb_width / pixmap.width())) + 46
+        self.setFixedSize(card_width, card_height)
+
+    def set_pixmap(self, pixmap: QPixmap):
+        """Swap in a freshly rendered thumbnail, e.g. after the page was rotated."""
+        self._image.setPixmap(pixmap)
+        self._fit_to(pixmap)
 
     def _on_preview(self):
         grid = self.parent()
@@ -123,6 +133,22 @@ class ThumbnailGrid(QScrollArea):
         self._min_columns = MIN_COLUMNS
         self._selected_set: set[int] = set()
 
+        # Floating "back to top" button, overlaid on the viewport
+        self._top_btn = QPushButton("\u25b2", self.viewport())
+        self._top_btn.setToolTip(self.tr("Back to top  (Home)"))
+        self._top_btn.setFixedSize(TOP_BUTTON_SIZE, TOP_BUTTON_SIZE)
+        self._top_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._top_btn.setStyleSheet(
+            "QPushButton {"
+            f" border-radius: {TOP_BUTTON_SIZE // 2}px;"
+            " background: rgba(41, 121, 255, 0.85); color: white;"
+            " font-size: 15px; border: none; }"
+            "QPushButton:hover { background: rgba(41, 121, 255, 1.0); }"
+        )
+        self._top_btn.clicked.connect(self.scroll_to_top)
+        self._top_btn.hide()
+        self.verticalScrollBar().valueChanged.connect(self._update_top_button)
+
     @property
     def min_columns(self) -> int:
         return self._min_columns
@@ -177,8 +203,49 @@ class ThumbnailGrid(QScrollArea):
         cols = max(self._min_columns, available // card_w) if card_w > 0 else self._min_columns
         return cols
 
+    def scroll_to_top(self):
+        self.verticalScrollBar().setValue(0)
+
+    def scroll_to_bottom(self):
+        bar = self.verticalScrollBar()
+        bar.setValue(bar.maximum())
+
+    def _update_top_button(self):
+        """Show the button once the user has scrolled a meaningful distance.
+
+        Half a viewport is the target, but a document that overflows by less
+        than that would never reach the threshold, so cap it at half of
+        whatever the document can actually scroll.
+        """
+        bar = self.verticalScrollBar()
+        threshold = min(self.viewport().height() // 2, bar.maximum() // 2)
+        self._top_btn.setVisible(bar.maximum() > 0 and bar.value() > threshold)
+
+    def _position_top_button(self):
+        x = self.viewport().width() - TOP_BUTTON_SIZE - TOP_BUTTON_MARGIN
+        y = self.viewport().height() - TOP_BUTTON_SIZE - TOP_BUTTON_MARGIN
+        self._top_btn.move(max(0, x), max(0, y))
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Home:
+            self.scroll_to_top()
+            event.accept()
+        elif event.key() == Qt.Key.Key_End:
+            self.scroll_to_bottom()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
+
+    def refresh_card(self, index: int):
+        """Re-render one thumbnail in place, keeping its selection."""
+        if not self._renderer or not 0 <= index < len(self._cards):
+            return
+        self._cards[index].set_pixmap(self._renderer.render_page(index, self._thumb_width))
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        self._position_top_button()
+        self._update_top_button()
         if self._cards and self._renderer:
             new_cols = self._calc_columns()
             # Only re-layout if column count changed

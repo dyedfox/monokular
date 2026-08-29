@@ -36,36 +36,48 @@ class MainWindow(QMainWindow):
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
 
-        open_action = toolbar.addAction("Open PDF")
+        open_action = toolbar.addAction(self.tr("Open PDF"))
         open_action.triggered.connect(self._open_file)
 
         toolbar.addSeparator()
 
-        self._select_all_action = toolbar.addAction("Select All")
+        self._select_all_action = toolbar.addAction(self.tr("Select All"))
         self._select_all_action.triggered.connect(self._select_all)
         self._select_all_action.setEnabled(False)
 
-        self._deselect_action = toolbar.addAction("Deselect All")
+        self._deselect_action = toolbar.addAction(self.tr("Deselect All"))
         self._deselect_action.triggered.connect(self._deselect_all)
         self._deselect_action.setEnabled(False)
 
         toolbar.addSeparator()
 
-        self._export_action = toolbar.addAction("Export Selected")
+        self._rotate_left_action = toolbar.addAction("\u21ba")
+        self._rotate_left_action.setToolTip(self.tr("Rotate selected pages left"))
+        self._rotate_left_action.triggered.connect(lambda: self._rotate_selected(-90))
+        self._rotate_left_action.setEnabled(False)
+
+        self._rotate_right_action = toolbar.addAction("\u21bb")
+        self._rotate_right_action.setToolTip(self.tr("Rotate selected pages right"))
+        self._rotate_right_action.triggered.connect(lambda: self._rotate_selected(90))
+        self._rotate_right_action.setEnabled(False)
+
+        toolbar.addSeparator()
+
+        self._export_action = toolbar.addAction(self.tr("Export Selected"))
         self._export_action.triggered.connect(self._export)
         self._export_action.setEnabled(False)
 
         toolbar.addSeparator()
 
         self._zoom_out_action = toolbar.addAction("🔍−")
-        self._zoom_out_action.setToolTip("Smaller thumbnails")
+        self._zoom_out_action.setToolTip(self.tr("Smaller thumbnails"))
         self._zoom_out_action.triggered.connect(self._thumb_zoom_out)
 
         self._zoom_label = QLabel(f" {ThumbnailGrid.THUMB_SIZES.index(180) + 1}/{len(ThumbnailGrid.THUMB_SIZES)} ")
         toolbar.addWidget(self._zoom_label)
 
         self._zoom_in_action = toolbar.addAction("🔍+")
-        self._zoom_in_action.setToolTip("Larger thumbnails")
+        self._zoom_in_action.setToolTip(self.tr("Larger thumbnails"))
         self._zoom_in_action.triggered.connect(self._thumb_zoom_in)
 
         # Apply saved thumbnail size
@@ -85,16 +97,16 @@ class MainWindow(QMainWindow):
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         toolbar.addWidget(spacer)
 
-        settings_action = toolbar.addAction("Settings")
+        settings_action = toolbar.addAction(self.tr("Settings"))
         settings_action.triggered.connect(self._open_settings)
 
-        about_action = toolbar.addAction("About")
+        about_action = toolbar.addAction(self.tr("About"))
         about_action.triggered.connect(self._show_about)
 
         # Central: stack with placeholder and grid
         self._stack = QStackedWidget()
 
-        self._placeholder = QLabel("Open a PDF or drag & drop one here")
+        self._placeholder = QLabel(self.tr("Open a PDF or drag & drop one here"))
         self._placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._placeholder.setStyleSheet("font-size: 18px; color: #888;")
 
@@ -105,9 +117,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self._stack)
 
         # Status bar for selection info
-        self._status_label = QLabel("No pages selected")
+        self._status_label = QLabel(self.tr("No pages selected"))
         self.statusBar().addWidget(self._status_label)
-        self.statusBar().addPermanentWidget(QLabel("Ctrl+Click to preview"))
+        self.statusBar().addPermanentWidget(QLabel(self.tr("Ctrl+Click to preview")))
         self._grid.selection_changed.connect(self._update_selection_status)
         self._grid.preview_requested.connect(self._preview_page)
 
@@ -130,7 +142,7 @@ class MainWindow(QMainWindow):
         if self._settings.get("general/remember_last_dir"):
             start_dir = self._settings.get("general/last_open_dir")
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open PDF", start_dir, "PDF Files (*.pdf)"
+            self, self.tr("Open PDF"), start_dir, self.tr("PDF Files (*.pdf)")
         )
         if not path:
             return
@@ -175,18 +187,30 @@ class MainWindow(QMainWindow):
     def _deselect_all(self):
         self._grid.deselect_all()
 
+    def _rotate_selected(self, delta: int):
+        """Turn every selected page and refresh just those thumbnails."""
+        if not self._renderer:
+            return
+        for idx in self._grid.selected_indices():
+            self._renderer.rotate(idx, delta)
+            self._grid.refresh_card(idx)
+
     def _update_selection_status(self):
         selected = self._grid.selected_indices()
+        self._rotate_left_action.setEnabled(bool(selected))
+        self._rotate_right_action.setEnabled(bool(selected))
         if not selected:
-            self._status_label.setText("No pages selected")
+            self._status_label.setText(self.tr("No pages selected"))
         else:
             pages = ", ".join(str(i + 1) for i in selected)
-            self._status_label.setText(f"Selected ({len(selected)}): pages {pages}")
+            self._status_label.setText(
+                self.tr("Selected (%n): pages {0}", "", len(selected)).format(pages)
+            )
 
     def _export(self):
         selected = self._grid.selected_indices()
         if not selected:
-            QMessageBox.information(self, "Export", "No pages selected.")
+            QMessageBox.information(self, self.tr("Export"), self.tr("No pages selected."))
             return
         dialog = ExportDialog(self._renderer, selected, self._settings, self)
         dialog.exec()
@@ -196,6 +220,7 @@ class MainWindow(QMainWindow):
             selected = set(self._grid.selected_indices())
             dialog = PreviewDialog(self._renderer, index, selected, self)
             dialog.selection_toggled.connect(self._on_preview_selection_toggled)
+            dialog.rotation_changed.connect(self._on_preview_rotation_changed)
             dialog.exec()
 
     def _on_preview_selection_toggled(self, page_index: int, selected: bool):
@@ -203,6 +228,10 @@ class MainWindow(QMainWindow):
         if 0 <= page_index < len(self._grid._cards):
             self._grid._cards[page_index].set_selected(selected)
             self._grid.selection_changed.emit()
+
+    def _on_preview_rotation_changed(self, page_index: int):
+        """Mirror a rotation made in the preview back onto its thumbnail."""
+        self._grid.refresh_card(page_index)
 
     def _thumb_zoom_in(self):
         sizes = ThumbnailGrid.THUMB_SIZES
@@ -236,8 +265,8 @@ class MainWindow(QMainWindow):
     def _show_about(self):
         QMessageBox.about(
             self,
-            "About Monokular",
+            self.tr("About Monokular"),
             f"<h3>Monokular v{__version__}</h3>"
-            "<p>Export PDF pages as images — one thing, done well.</p>"
-            "<p>License: GPL-3.0-or-later</p>",
+            f"<p>{self.tr('Export PDF pages as images — one thing, done well.')}</p>"
+            f"<p>{self.tr('License: {0}').format('GPL-3.0-or-later')}</p>",
         )

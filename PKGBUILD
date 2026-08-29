@@ -1,6 +1,6 @@
 # Maintainer: Yaroslav Krytsun <slavko7 at gmail dot com>
 pkgname=monokular
-pkgver=1.0.1
+pkgver=1.1.0
 pkgrel=1
 pkgdesc="Export PDF pages as images with preview - one thing, done well"
 arch=('any')
@@ -12,6 +12,7 @@ depends=(
     'python-pymupdf'
 )
 makedepends=('git')
+optdepends=('qt6-imageformats: WEBP and TIFF export')
 source=("$pkgname-$pkgver::git+${url}.git#tag=v${pkgver}")
 sha256sums=('SKIP')
 
@@ -21,6 +22,10 @@ package() {
     # Install app files
     install -dm755 "$pkgdir/usr/lib/$pkgname"
     cp -r app/ main.py "$pkgdir/usr/lib/$pkgname/"
+
+    # Install compiled translations
+    install -dm755 "$pkgdir/usr/lib/$pkgname/translations"
+    install -m644 translations/*.qm "$pkgdir/usr/lib/$pkgname/translations/"
 
     # Install icon
     install -Dm644 assets/icon.svg \

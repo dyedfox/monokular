@@ -42,3 +42,16 @@ class Settings:
     def reset_all(self):
         for key, value in DEFAULTS.items():
             self._qs.setValue(f"settings/{key}", value)
+
+
+def save_geometry(key: str, widget):
+    """Persist a window's size and position under window/<key>."""
+    QSettings("Monokular", "Monokular").setValue(f"window/{key}", widget.saveGeometry())
+
+
+def restore_geometry(key: str, widget) -> bool:
+    """Restore a window's saved geometry. Returns False when nothing was saved."""
+    geometry = QSettings("Monokular", "Monokular").value(f"window/{key}")
+    if not geometry:
+        return False
+    return widget.restoreGeometry(geometry)
