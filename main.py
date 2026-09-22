@@ -6,6 +6,7 @@ from PyQt6.QtWidgets import QApplication
 
 from app import i18n
 from app.main_window import MainWindow
+from app.omarchy_theme import apply as apply_omarchy_theme
 
 def _find_icon():
     """Resolve icon path for PyInstaller, system install, or local dev."""
@@ -33,6 +34,7 @@ def main():
     app.setApplicationName("Monokular")
     app.setDesktopFileName("monokular")
     app.setWindowIcon(QIcon(ICON_PATH))
+    _omarchy_theme = apply_omarchy_theme(app)  # no-op outside Omarchy; kept alive for app lifetime
     i18n.install_translator(app)
 
     window = MainWindow()

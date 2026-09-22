@@ -1,10 +1,11 @@
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QKeySequence, QShortcut
+from PyQt6.QtCore import QEvent, Qt, pyqtSignal
+from PyQt6.QtGui import QIntValidator, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QPushButton,
     QScrollArea,
     QVBoxLayout,
@@ -15,6 +16,11 @@ from app.settings import restore_geometry, save_geometry
 
 ZOOM_LEVELS = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]
 BASE_WIDTH = 900
+
+# A touchpad pinch reports many small fractional deltas over the course of
+# one gesture; stepping ZOOM_LEVELS on every event would be too twitchy, so
+# deltas accumulate until they cross this fraction.
+PINCH_STEP_THRESHOLD = 0.08
 
 
 class PreviewDialog(QDialog):
@@ -30,6 +36,7 @@ class PreviewDialog(QDialog):
         self._page_index = page_index
         self._page_count = renderer.page_count
         self._zoom_idx = ZOOM_LEVELS.index(1.0)
+        self._pinch_accum = 0.0
         self._selected_indices: set[int] = selected_indices.copy() if selected_indices else set()
 
         self.setWindowTitle(self._make_title())
@@ -51,10 +58,16 @@ class PreviewDialog(QDialog):
         self._prev_btn.clicked.connect(self._go_prev)
         tb.addWidget(self._prev_btn)
 
-        self._page_label = QLabel()
-        self._page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._page_label.setFixedWidth(80)
-        tb.addWidget(self._page_label)
+        self._page_input = QLineEdit()
+        self._page_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._page_input.setFixedWidth(40)
+        self._page_input.setToolTip(self.tr("Go to page"))
+        self._page_input.setValidator(QIntValidator(1, self._page_count, self))
+        self._page_input.returnPressed.connect(self._jump_to_page_input)
+        tb.addWidget(self._page_input)
+
+        self._page_total_label = QLabel()
+        tb.addWidget(self._page_total_label)
 
         self._next_btn = QPushButton("▶")
         self._next_btn.setToolTip(self.tr("Next page"))
@@ -119,9 +132,17 @@ class PreviewDialog(QDialog):
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._scroll.setWidget(self._image_label)
 
+        # Two-finger pinch on a touchpad arrives as a native gesture targeted
+        # at the viewport under the cursor, not at this dialog, so it's
+        # caught with an event filter rather than an event()/wheelEvent()
+        # override here.
+        self._scroll.viewport().installEventFilter(self)
+
         # Keyboard shortcuts
         QShortcut(QKeySequence(Qt.Key.Key_Left), self, self._go_prev)
         QShortcut(QKeySequence(Qt.Key.Key_Right), self, self._go_next)
+        QShortcut(QKeySequence(Qt.Key.Key_Home), self, self._go_first)
+        QShortcut(QKeySequence(Qt.Key.Key_End), self, self._go_last)
         QShortcut(QKeySequence("["), self, self._rotate_left)
         QShortcut(QKeySequence("]"), self, self._rotate_right)
 
@@ -136,7 +157,8 @@ class PreviewDialog(QDialog):
     def _update_nav(self):
         self._prev_btn.setEnabled(self._page_index > 0)
         self._next_btn.setEnabled(self._page_index < self._page_count - 1)
-        self._page_label.setText(f"{self._page_index + 1} / {self._page_count}")
+        self._page_input.setText(str(self._page_index + 1))
+        self._page_total_label.setText(f"/ {self._page_count}")
         self.setWindowTitle(self._make_title())
 
         # Update checkbox without triggering signal
@@ -144,17 +166,33 @@ class PreviewDialog(QDialog):
         self._select_cb.setChecked(self._page_index in self._selected_indices)
         self._select_cb.blockSignals(False)
 
-    def _go_prev(self):
-        if self._page_index > 0:
-            self._page_index -= 1
+    def _go_to_page(self, target: int):
+        target = max(0, min(target, self._page_count - 1))
+        if target != self._page_index:
+            self._page_index = target
             self._render()
-            self._update_nav()
+        self._update_nav()
+
+    def _go_prev(self):
+        self._go_to_page(self._page_index - 1)
 
     def _go_next(self):
-        if self._page_index < self._page_count - 1:
-            self._page_index += 1
-            self._render()
-            self._update_nav()
+        self._go_to_page(self._page_index + 1)
+
+    def _go_first(self):
+        self._go_to_page(0)
+
+    def _go_last(self):
+        self._go_to_page(self._page_count - 1)
+
+    def _jump_to_page_input(self):
+        try:
+            page_num = int(self._page_input.text())
+        except ValueError:
+            self._update_nav()  # revert to the current page
+            return
+        self._go_to_page(page_num - 1)
+        self._page_input.clearFocus()
 
     def _rotate_left(self):
         self._rotate(-90)
@@ -220,3 +258,19 @@ class PreviewDialog(QDialog):
             event.accept()
         else:
             super().wheelEvent(event)
+
+    def eventFilter(self, obj, event):
+        if obj is self._scroll.viewport() and event.type() == QEvent.Type.NativeGesture:
+            if event.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
+                self._handle_pinch(event.value())
+                return True
+        return super().eventFilter(obj, event)
+
+    def _handle_pinch(self, delta: float):
+        self._pinch_accum += delta
+        while self._pinch_accum >= PINCH_STEP_THRESHOLD:
+            self._zoom_in()
+            self._pinch_accum -= PINCH_STEP_THRESHOLD
+        while self._pinch_accum <= -PINCH_STEP_THRESHOLD:
+            self._zoom_out()
+            self._pinch_accum += PINCH_STEP_THRESHOLD

@@ -122,6 +122,8 @@ class MainWindow(QMainWindow):
         self.statusBar().addPermanentWidget(QLabel(self.tr("Ctrl+Click to preview")))
         self._grid.selection_changed.connect(self._update_selection_status)
         self._grid.preview_requested.connect(self._preview_page)
+        self._grid.zoom_in_requested.connect(self._thumb_zoom_in)
+        self._grid.zoom_out_requested.connect(self._thumb_zoom_out)
 
         # Keyboard shortcuts
         QShortcut(QKeySequence("Ctrl+Q"), self, self.close)
