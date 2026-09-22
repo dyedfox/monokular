@@ -1,4 +1,4 @@
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
     QFrame,
@@ -19,6 +19,11 @@ SPACING = 10
 CARD_PADDING = 16
 TOP_BUTTON_SIZE = 40
 TOP_BUTTON_MARGIN = 16
+
+# A touchpad pinch reports many small fractional deltas over the course of
+# one gesture; stepping the thumbnail size on every event would be too
+# twitchy, so deltas accumulate until they cross this fraction.
+PINCH_STEP_THRESHOLD = 0.08
 
 
 class ThumbCard(QFrame):
@@ -114,6 +119,8 @@ class ThumbnailGrid(QScrollArea):
 
     selection_changed = pyqtSignal()
     preview_requested = pyqtSignal(int)
+    zoom_in_requested = pyqtSignal()
+    zoom_out_requested = pyqtSignal()
 
     THUMB_SIZES = [100, 140, 180, 240, 320]
 
@@ -132,6 +139,13 @@ class ThumbnailGrid(QScrollArea):
         self._thumb_width = DEFAULT_THUMB_WIDTH
         self._min_columns = MIN_COLUMNS
         self._selected_set: set[int] = set()
+        self._pinch_accum = 0.0
+
+        # Two-finger pinch on a touchpad arrives as a native gesture targeted
+        # at the viewport under the cursor, which QAbstractScrollArea doesn't
+        # forward to this widget's own event handlers (unlike wheel events),
+        # so it's caught with an event filter instead.
+        self.viewport().installEventFilter(self)
 
         # Floating "back to top" button, overlaid on the viewport
         self._top_btn = QPushButton("\u25b2", self.viewport())
@@ -235,6 +249,32 @@ class ThumbnailGrid(QScrollArea):
             event.accept()
         else:
             super().keyPressEvent(event)
+
+    def wheelEvent(self, event):
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            if event.angleDelta().y() > 0:
+                self.zoom_in_requested.emit()
+            else:
+                self.zoom_out_requested.emit()
+            event.accept()
+        else:
+            super().wheelEvent(event)
+
+    def eventFilter(self, obj, event):
+        if obj is self.viewport() and event.type() == QEvent.Type.NativeGesture:
+            if event.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
+                self._handle_pinch(event.value())
+                return True
+        return super().eventFilter(obj, event)
+
+    def _handle_pinch(self, delta: float):
+        self._pinch_accum += delta
+        while self._pinch_accum >= PINCH_STEP_THRESHOLD:
+            self.zoom_in_requested.emit()
+            self._pinch_accum -= PINCH_STEP_THRESHOLD
+        while self._pinch_accum <= -PINCH_STEP_THRESHOLD:
+            self.zoom_out_requested.emit()
+            self._pinch_accum += PINCH_STEP_THRESHOLD
 
     def refresh_card(self, index: int):
         """Re-render one thumbnail in place, keeping its selection."""
