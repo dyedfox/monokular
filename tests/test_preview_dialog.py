@@ -1,5 +1,6 @@
 import pytest
 
+from app import settings
 from app.pdf_renderer import PdfRenderer
 from app.preview_dialog import PreviewDialog
 
@@ -60,6 +61,33 @@ def test_preview_size_is_remembered_for_the_next_opening(renderer, clean_qsettin
 
     second = PreviewDialog(renderer, 0)
     second.show()
+    assert (second.width(), second.height()) == (720, 540)
+
+
+def test_preview_size_is_remembered_on_wayland(renderer, clean_qsettings, monkeypatch):
+    monkeypatch.setattr(settings, "_is_wayland", lambda: True)
+    first = PreviewDialog(renderer, 0)
+    first.show()
+    first.resize(720, 540)
+    first.close()
+
+    second = PreviewDialog(renderer, 0)
+    second.show()
+    assert (second.width(), second.height()) == (720, 540)
+
+
+def test_compositor_maximized_flag_does_not_shrink_the_preview_on_wayland(
+        renderer, clean_qsettings, monkeypatch):
+    # Hyprland reports even floating dialogs as maximized; the size the user
+    # actually sees must still be what comes back next time.
+    monkeypatch.setattr(settings, "_is_wayland", lambda: True)
+    first = PreviewDialog(renderer, 0)
+    first.show()
+    first.resize(720, 540)
+    monkeypatch.setattr(first, "saveGeometry", lambda: pytest.fail("blob used on Wayland"))
+    first.close()
+
+    second = PreviewDialog(renderer, 0)
     assert (second.width(), second.height()) == (720, 540)
 
 
