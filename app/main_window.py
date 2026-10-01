@@ -1,5 +1,7 @@
-from PyQt6.QtCore import QSettings, Qt
-from PyQt6.QtGui import QKeySequence, QShortcut
+import os
+
+from PyQt6.QtCore import QSettings, QSize, Qt, QTimer
+from PyQt6.QtGui import QIcon, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QFileDialog,
     QLabel,
@@ -12,13 +14,15 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app import glyphs, pdf_info
 from app.export_dialog import ExportDialog
+from app.info_dialog import InfoDialog
 from app.pdf_renderer import PdfRenderer
 from app.preview_dialog import PreviewDialog
 from app.settings import Settings
 from app.settings_dialog import SettingsDialog
 from app.thumbnail_grid import ThumbnailGrid
-from app.version import __version__
+from app.version import PROJECT_URL, __version__
 
 
 class MainWindow(QMainWindow):
@@ -38,6 +42,16 @@ class MainWindow(QMainWindow):
 
         open_action = toolbar.addAction(self.tr("Open PDF"))
         open_action.triggered.connect(self._open_file)
+
+        self._info_action = toolbar.addAction(self.tr("Info"))
+        self._info_action.setShortcut(QKeySequence("Ctrl+I"))
+        self._info_action.triggered.connect(self._show_info)
+        self._info_action.setEnabled(False)
+        if not glyphs.apply(self._info_action, "document-properties"):
+            theme_icon = QIcon.fromTheme("document-properties")
+            if not theme_icon.isNull():
+                self._info_action.setIcon(theme_icon)
+        self._update_info_tooltip()
 
         toolbar.addSeparator()
 
@@ -90,6 +104,15 @@ class MainWindow(QMainWindow):
         self._grid.thumb_width = ThumbnailGrid.THUMB_SIZES[self._thumb_size_idx]
         self._grid.min_columns = self._settings.get("thumbnails/min_columns")
         self._update_zoom_label()
+
+        for action, name in (
+            (self._rotate_left_action, "rotate-left"),
+            (self._rotate_right_action, "rotate-right"),
+            (self._zoom_out_action, "zoom-out"),
+            (self._zoom_in_action, "zoom-in"),
+        ):
+            if glyphs.apply(action, name):
+                toolbar.setIconSize(QSize(20, 20))
 
         toolbar.addSeparator()
 
@@ -151,7 +174,6 @@ class MainWindow(QMainWindow):
         self._load_pdf(path)
 
     def _load_pdf(self, path: str):
-        import os
         if self._renderer:
             self._renderer.close()
 
@@ -164,6 +186,8 @@ class MainWindow(QMainWindow):
         self._grid.load(self._renderer)
         self._stack.setCurrentWidget(self._grid)
 
+        self._info_action.setEnabled(True)
+        self._update_info_tooltip()
         self._select_all_action.setEnabled(True)
         self._deselect_action.setEnabled(True)
         self._export_action.setEnabled(True)
@@ -180,7 +204,11 @@ class MainWindow(QMainWindow):
         for url in event.mimeData().urls():
             path = url.toLocalFile()
             if path.lower().endswith(".pdf"):
-                self._load_pdf(path)
+                event.acceptProposedAction()
+                # Rendering every thumbnail takes a second or more; doing it
+                # here would hold the drag-and-drop session (and the drag
+                # source) open until it finished.
+                QTimer.singleShot(0, lambda: self._load_pdf(path))
                 return
 
     def _select_all(self):
@@ -220,7 +248,10 @@ class MainWindow(QMainWindow):
     def _preview_page(self, index: int):
         if self._renderer:
             selected = set(self._grid.selected_indices())
-            dialog = PreviewDialog(self._renderer, index, selected, self)
+            dialog = PreviewDialog(
+                self._renderer, index, selected, self,
+                wheel_action=self._settings.get("preview/wheel_action"),
+            )
             dialog.selection_toggled.connect(self._on_preview_selection_toggled)
             dialog.rotation_changed.connect(self._on_preview_rotation_changed)
             dialog.exec()
@@ -264,11 +295,23 @@ class MainWindow(QMainWindow):
                 self._update_zoom_label()
             self._grid.min_columns = self._settings.get("thumbnails/min_columns")
 
+    def _update_info_tooltip(self):
+        tip = self.tr("Document info  (Ctrl+I)")
+        if self._renderer:
+            # The file name first: hovering is the quick way to see it.
+            tip = f"{os.path.basename(self._renderer.path)}\n{tip}"
+        self._info_action.setToolTip(tip)
+
+    def _show_info(self):
+        if self._renderer:
+            InfoDialog(pdf_info.collect(self._renderer), self).exec()
+
     def _show_about(self):
         QMessageBox.about(
             self,
             self.tr("About Monokular"),
             f"<h3>Monokular v{__version__}</h3>"
             f"<p>{self.tr('Export PDF pages as images — one thing, done well.')}</p>"
-            f"<p>{self.tr('License: {0}').format('GPL-3.0-or-later')}</p>",
+            f"<p>{self.tr('License: {0}').format('GPL-3.0-or-later')}</p>"
+            f'<p><a href="{PROJECT_URL}">{PROJECT_URL.removeprefix("https://")}</a></p>',
         )

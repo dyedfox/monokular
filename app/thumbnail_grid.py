@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QEvent, Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QColor, QPixmap
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from app import glyphs
 from app.pdf_renderer import PdfRenderer
 
 DEFAULT_THUMB_WIDTH = 180
@@ -159,6 +160,8 @@ class ThumbnailGrid(QScrollArea):
             " font-size: 15px; border: none; }"
             "QPushButton:hover { background: rgba(41, 121, 255, 1.0); }"
         )
+        # White, like the arrow it replaces: the button keeps its own blue.
+        glyphs.apply(self._top_btn, "go-top", color=QColor("white"))
         self._top_btn.clicked.connect(self.scroll_to_top)
         self._top_btn.hide()
         self.verticalScrollBar().valueChanged.connect(self._update_top_button)

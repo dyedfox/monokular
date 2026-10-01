@@ -73,3 +73,26 @@ def test_resetting_defaults_returns_to_the_default_output_mode(dialog):
     dialog._output_mode.setCurrentText("Always this folder")
     dialog._reset()
     assert dialog._output_mode.currentData() == "same_as_pdf"
+
+
+def test_wheel_action_defaults_to_scrolling_the_page(dialog):
+    assert dialog._wheel_action.currentData() == "scroll"
+
+
+def test_wheel_action_saves_the_storage_key(dialog, settings):
+    dialog._wheel_action.setCurrentText("Go to previous/next page")
+    dialog._save()
+    assert settings.get("preview/wheel_action") == "navigate"
+
+
+def test_wheel_action_starts_on_the_saved_key(qapp):
+    from tests.conftest import FakeSettings
+
+    d = SettingsDialog(FakeSettings(**{"preview/wheel_action": "zoom"}))
+    assert d._wheel_action.currentData() == "zoom"
+
+
+def test_resetting_defaults_returns_the_wheel_to_scrolling(dialog):
+    dialog._wheel_action.setCurrentText("Zoom")
+    dialog._reset()
+    assert dialog._wheel_action.currentData() == "scroll"

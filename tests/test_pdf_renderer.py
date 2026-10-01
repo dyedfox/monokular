@@ -91,3 +91,14 @@ def test_write_pdf_carries_page_rotation(renderer, tmp_path):
 def test_write_pdf_returns_the_path_it_wrote(renderer, tmp_path):
     out = tmp_path / "out.pdf"
     assert renderer.write_pdf([0], str(out)) == str(out)
+
+
+def test_closing_empties_mupdfs_shared_image_store(qapp, pdf_path, monkeypatch):
+    # The store outlives documents; left alone, each PDF opened in turn
+    # piles its decoded images on top of the last one's.
+    calls = []
+    monkeypatch.setattr(fitz.TOOLS, "store_shrink", calls.append)
+    r = PdfRenderer(pdf_path)
+    r.render_page(0, 100)
+    r.close()
+    assert calls == [100]

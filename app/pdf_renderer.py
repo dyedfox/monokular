@@ -11,6 +11,11 @@ class PdfRenderer:
         self.path = path
 
     @property
+    def doc(self) -> fitz.Document:
+        """The underlying PyMuPDF document, for reading facts about it."""
+        return self._doc
+
+    @property
     def page_count(self) -> int:
         return len(self._doc)
 
@@ -59,3 +64,8 @@ class PdfRenderer:
 
     def close(self):
         self._doc.close()
+        # MuPDF keeps decoded images in one store shared by every document,
+        # unbounded under PyMuPDF and not emptied when a document closes.
+        # Scanned PDFs are mostly images, so without this each PDF opened in
+        # turn left ~50-150 MB behind for good.
+        fitz.TOOLS.store_shrink(100)

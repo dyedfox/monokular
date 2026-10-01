@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
 )
 
 from app.export import available_formats, find_format, page_filename, pdf_filename
+from app.preview_dialog import WHEEL_ACTIONS
 from app.settings import DEFAULTS, Settings
 
 #: Stored values for export/output_mode, in the order they are offered.
@@ -111,6 +112,19 @@ class SettingsDialog(QDialog):
         self._min_cols.setValue(settings.get("thumbnails/min_columns"))
         form.addRow(self.tr("Minimum grid columns:"), self._min_cols)
 
+        # --- Preview ---
+        self._wheel_action = QComboBox()
+        labels = [
+            self.tr("Scroll the page"),
+            self.tr("Zoom"),
+            self.tr("Go to previous/next page"),
+        ]
+        for key, label in zip(WHEEL_ACTIONS, labels):
+            self._wheel_action.addItem(label, key)
+        self._select_wheel_action(settings.get("preview/wheel_action"))
+        self._wheel_action.setToolTip(self.tr("Ctrl+wheel always zooms."))
+        form.addRow(self.tr("Mouse wheel in preview:"), self._wheel_action)
+
         # --- General ---
         self._remember_dir = QCheckBox(self.tr("Remember last opened directory"))
         self._remember_dir.setChecked(settings.get("general/remember_last_dir"))
@@ -136,6 +150,11 @@ class SettingsDialog(QDialog):
         if index >= 0:
             self._output_mode.setCurrentIndex(index)
 
+    def _select_wheel_action(self, key: str):
+        index = self._wheel_action.findData(key)
+        if index >= 0:
+            self._wheel_action.setCurrentIndex(index)
+
     def _on_output_mode(self):
         is_fixed = self._output_mode.currentData() == "fixed"
         self._fixed_path.setEnabled(is_fixed)
@@ -157,6 +176,7 @@ class SettingsDialog(QDialog):
         self._zero_padding.setValue(DEFAULTS["naming/zero_padding"])
         self._thumb_size.setCurrentIndex(self._thumb_size.findData(DEFAULTS["thumbnails/default_size"]))
         self._min_cols.setValue(DEFAULTS["thumbnails/min_columns"])
+        self._select_wheel_action(DEFAULTS["preview/wheel_action"])
         self._remember_dir.setChecked(DEFAULTS["general/remember_last_dir"])
 
     def _save(self):
@@ -170,6 +190,7 @@ class SettingsDialog(QDialog):
         self._settings.set("naming/zero_padding", self._zero_padding.value())
         self._settings.set("thumbnails/default_size", self._thumb_size.currentData())
         self._settings.set("thumbnails/min_columns", self._min_cols.value())
+        self._settings.set("preview/wheel_action", self._wheel_action.currentData())
         self._settings.set("general/remember_last_dir", self._remember_dir.isChecked())
         self.accept()
 

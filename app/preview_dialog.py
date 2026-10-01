@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
 )
 
+from app import glyphs
 from app.pdf_renderer import PdfRenderer
 from app.settings import restore_geometry, save_geometry
 
@@ -22,6 +23,13 @@ BASE_WIDTH = 900
 # deltas accumulate until they cross this fraction.
 PINCH_STEP_THRESHOLD = 0.08
 
+# One notch of a standard mouse wheel; touchpads report fractions of it, which
+# accumulate until they add up to a whole step.
+WHEEL_STEP = 120
+
+#: Stored values for preview/wheel_action, in the order they are offered.
+WHEEL_ACTIONS = ["scroll", "zoom", "navigate"]
+
 
 class PreviewDialog(QDialog):
     """Shows a zoomable preview of a single PDF page with navigation and selection."""
@@ -30,8 +38,11 @@ class PreviewDialog(QDialog):
     rotation_changed = pyqtSignal(int)  # page_index
 
     def __init__(self, renderer: PdfRenderer, page_index: int,
-                 selected_indices: set[int] | None = None, parent=None):
+                 selected_indices: set[int] | None = None, parent=None,
+                 wheel_action: str = "scroll"):
         super().__init__(parent)
+        self._wheel_action = wheel_action
+        self._wheel_accum = 0
         self._renderer = renderer
         self._page_index = page_index
         self._page_count = renderer.page_count
@@ -122,6 +133,16 @@ class PreviewDialog(QDialog):
 
         layout.addLayout(tb)
 
+        for button, name in (
+            (self._prev_btn, "go-previous"),
+            (self._next_btn, "go-next"),
+            (self._zoom_out_btn, "zoom-out"),
+            (self._zoom_in_btn, "zoom-in"),
+            (rotate_left_btn, "rotate-left"),
+            (rotate_right_btn, "rotate-right"),
+        ):
+            glyphs.apply(button, name)
+
         # Scroll area with image
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -137,6 +158,13 @@ class PreviewDialog(QDialog):
         # caught with an event filter rather than an event()/wheelEvent()
         # override here.
         self._scroll.viewport().installEventFilter(self)
+
+        # Dragging with the left button pans the page. The hand cursor shows
+        # only when there's somewhere to pan to, which changes with the zoom,
+        # the page, and the window size, all of which re-range the scrollbars.
+        self._pan_origin = None  # (global press point, h value, v value)
+        for bar in (self._scroll.horizontalScrollBar(), self._scroll.verticalScrollBar()):
+            bar.rangeChanged.connect(self._update_pan_cursor)
 
         # Keyboard shortcuts
         QShortcut(QKeySequence(Qt.Key.Key_Left), self, self._go_prev)
@@ -260,11 +288,82 @@ class PreviewDialog(QDialog):
             super().wheelEvent(event)
 
     def eventFilter(self, obj, event):
-        if obj is self._scroll.viewport() and event.type() == QEvent.Type.NativeGesture:
-            if event.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
-                self._handle_pinch(event.value())
-                return True
+        if obj is self._scroll.viewport():
+            if event.type() == QEvent.Type.NativeGesture:
+                if event.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
+                    self._handle_pinch(event.value())
+                    return True
+            elif event.type() == QEvent.Type.Wheel:
+                return self._handle_wheel(event)
+            elif event.type() in (
+                QEvent.Type.MouseButtonPress,
+                QEvent.Type.MouseMove,
+                QEvent.Type.MouseButtonRelease,
+            ):
+                return self._handle_pan(event)
         return super().eventFilter(obj, event)
+
+    def _can_pan(self) -> bool:
+        return (self._scroll.horizontalScrollBar().maximum() > 0
+                or self._scroll.verticalScrollBar().maximum() > 0)
+
+    def _update_pan_cursor(self):
+        viewport = self._scroll.viewport()
+        if self._pan_origin is not None:
+            viewport.setCursor(Qt.CursorShape.ClosedHandCursor)
+        elif self._can_pan():
+            viewport.setCursor(Qt.CursorShape.OpenHandCursor)
+        else:
+            viewport.unsetCursor()
+
+    def _handle_pan(self, event) -> bool:
+        """Drag the page with the left button; True when consumed."""
+        h_bar = self._scroll.horizontalScrollBar()
+        v_bar = self._scroll.verticalScrollBar()
+        kind = event.type()
+        if kind == QEvent.Type.MouseButtonPress:
+            if event.button() != Qt.MouseButton.LeftButton or not self._can_pan():
+                return False
+            self._pan_origin = (event.globalPosition(), h_bar.value(), v_bar.value())
+        elif self._pan_origin is None:
+            return False
+        elif kind == QEvent.Type.MouseMove:
+            start, h, v = self._pan_origin
+            moved = event.globalPosition() - start
+            h_bar.setValue(h - round(moved.x()))
+            v_bar.setValue(v - round(moved.y()))
+        elif event.button() == Qt.MouseButton.LeftButton:
+            self._pan_origin = None
+        self._update_pan_cursor()
+        event.accept()
+        return True
+
+    def _handle_wheel(self, event) -> bool:
+        """Zoom or turn pages per the wheel setting; True when consumed.
+
+        Caught on the viewport, before the scroll area turns it into scrolling.
+        Ctrl+wheel always zooms, whatever the setting.
+        """
+        ctrl = event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        action = "zoom" if ctrl else self._wheel_action
+        if action == "scroll":
+            return False
+
+        delta = event.angleDelta().y()
+        if delta == 0:
+            return False  # sideways scroll: leave it to the scroll area
+        if (delta > 0) != (self._wheel_accum > 0):
+            self._wheel_accum = 0  # changed direction: start a fresh step
+        self._wheel_accum += delta
+        while abs(self._wheel_accum) >= WHEEL_STEP:
+            up = self._wheel_accum > 0
+            self._wheel_accum -= WHEEL_STEP if up else -WHEEL_STEP
+            if action == "zoom":
+                self._zoom_in() if up else self._zoom_out()
+            else:
+                self._go_prev() if up else self._go_next()
+        event.accept()
+        return True
 
     def _handle_pinch(self, delta: float):
         self._pinch_accum += delta

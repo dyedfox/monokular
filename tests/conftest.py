@@ -5,8 +5,10 @@ import tempfile
 import fitz
 import pytest
 
-# Qt needs a platform plugin even for offscreen pixmap work.
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# Qt needs a platform plugin even for offscreen pixmap work. Forced, not a
+# default: desktop sessions often export QT_QPA_PLATFORM (e.g. "wayland;xcb"),
+# and on a real display, windows pop up and focus-dependent tests fail.
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

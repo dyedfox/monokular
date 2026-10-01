@@ -32,6 +32,8 @@ Configure export format, quality, PPI, naming, and more.
 
 - Open PDF files via toolbar, drag & drop, or command line
 - Selectable page thumbnails in a responsive grid
+- Document info: file name and folder, page count and paper size, whether
+  the PDF is text or scanned, and its metadata
 - Preview pages with zoom (Ctrl+Click or Preview button)
 - Rotate pages in the preview or straight from the toolbar — the grid, the
   preview, and the exported file all follow
@@ -40,11 +42,15 @@ Configure export format, quality, PPI, naming, and more.
 - Configurable quality and PPI (72–1200)
 - Jump back to the top of a long document with the floating button or `Home`
 - Remembers main and preview window sizes between sessions
+- In the preview, the mouse wheel can scroll the page, zoom, or turn pages
+  (chosen in Settings)
+- On Omarchy, follows the current theme live and uses its Nerd Font icons
 - Available in 25 languages, following your system locale
 
 ## Keyboard Shortcuts
 
 - `Ctrl+Q` — Quit
+- `Ctrl+I` — Document info
 - `Ctrl+Click` — Preview a page
 - `Home` / `End` — Jump to the top or bottom of the thumbnail grid
 
@@ -52,7 +58,10 @@ In the preview window:
 
 - `←` / `→` — Previous / next page
 - `[` / `]` — Rotate the page left / right
+- `Wheel` — Scroll the page, zoom, or go to the previous / next page,
+  as set in Settings
 - `Ctrl+Wheel` — Zoom
+- Drag with the left mouse button — Move a zoomed-in page around
 
 ## Usage (local)
 

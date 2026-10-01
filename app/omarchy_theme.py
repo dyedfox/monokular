@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PyQt6.QtCore import QFileSystemWatcher, QObject, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QPalette
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QProxyStyle, QStyle
 
 _STATE_DIR = Path.home() / ".local" / "state" / "omarchy" / "current"
 _COLORS_FILE = _STATE_DIR / "theme" / "colors.toml"
@@ -126,6 +126,16 @@ class OmarchyThemeManager(QObject):
                 widget.setStyleSheet(sheet)
 
 
+class _OmarchyStyle(QProxyStyle):
+    """Fusion without stock icons on dialog buttons (OK, Cancel, Close...).
+    Omarchy's own UI uses plain text buttons; Breeze on KDE keeps its icons."""
+
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QStyle.StyleHint.SH_DialogButtonBox_ButtonsHaveIcons:
+            return 0
+        return super().styleHint(hint, option, widget, returnData)
+
+
 _manager: OmarchyThemeManager | None = None
 
 
@@ -133,6 +143,6 @@ def apply(app: QApplication) -> OmarchyThemeManager | None:
     global _manager
     if not is_omarchy():
         return None
-    app.setStyle("Fusion")
+    app.setStyle(_OmarchyStyle("Fusion"))
     _manager = OmarchyThemeManager(app)
     return _manager
