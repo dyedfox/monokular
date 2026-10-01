@@ -14,6 +14,7 @@ DEFAULTS = {
     "naming/zero_padding": 2,
     "thumbnails/default_size": 180,
     "thumbnails/min_columns": 4,
+    "preview/wheel_action": "scroll",  # "scroll", "zoom", "navigate"
     "general/remember_last_dir": True,
     "general/last_open_dir": "",
 }
