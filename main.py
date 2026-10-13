@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QApplication
 from app import i18n
 from app.main_window import MainWindow
 from app.omarchy_theme import apply as apply_omarchy_theme
+from app.omarchy_theme import prefer_portal_dialogs
 
 def _find_icon():
     """Resolve icon path for PyInstaller, system install, or local dev."""
@@ -30,6 +31,7 @@ ICON_PATH = _find_icon()
 
 
 def main():
+    prefer_portal_dialogs()  # before QApplication: it picks the theme plugin
     app = QApplication(sys.argv)
     app.setApplicationName("Monokular")
     app.setDesktopFileName("monokular")
