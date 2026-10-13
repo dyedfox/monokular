@@ -46,6 +46,7 @@ Run `pylupdate6` from the project root:
 pylupdate6 \
     app/main_window.py app/thumbnail_grid.py app/preview_dialog.py \
     app/export_dialog.py app/settings_dialog.py app/info_dialog.py \
+    app/omarchy_theme.py \
     -ts translations/monokular_uk.ts
 ```
 

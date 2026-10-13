@@ -531,6 +531,19 @@
         </message>
     </context>
     <context>
+        <name>StandardButtons</name>
+        <message>
+            <location filename="../app/omarchy_theme.py" line="235" />
+            <source>&amp;OK</source>
+            <translation>&amp;OK</translation>
+        </message>
+        <message>
+            <location filename="../app/omarchy_theme.py" line="237" />
+            <source>&amp;Cancel</source>
+            <translation>&amp;Avbryt</translation>
+        </message>
+    </context>
+    <context>
         <name>ThumbCard</name>
         <message>
             <location filename="../app/thumbnail_grid.py" line="50" />

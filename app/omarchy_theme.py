@@ -2,9 +2,10 @@ import os
 import tomllib
 from pathlib import Path
 
-from PyQt6.QtCore import QFileSystemWatcher, QObject, QTimer, pyqtSignal
-from PyQt6.QtGui import QColor, QPalette
-from PyQt6.QtWidgets import QApplication, QProxyStyle, QStyle
+from PyQt6.QtCore import QCoreApplication, QFileSystemWatcher, QObject, QTimer, QTranslator, pyqtSignal, pyqtSlot
+from PyQt6.QtDBus import QDBusConnection, QDBusInterface, QDBusMessage
+from PyQt6.QtGui import QColor, QFont, QIcon, QPalette
+from PyQt6.QtWidgets import QApplication, QDialogButtonBox, QProxyStyle, QStyle
 
 _STATE_DIR = Path.home() / ".local" / "state" / "omarchy" / "current"
 _COLORS_FILE = _STATE_DIR / "theme" / "colors.toml"
@@ -25,6 +26,21 @@ _RELOAD_DEBOUNCE_MS = 400
 
 def is_omarchy() -> bool:
     return bool(os.environ.get("OMARCHY_PATH"))
+
+
+def prefer_portal_dialogs() -> None:
+    """Route file dialogs through the desktop portal on Omarchy.
+
+    Omarchy exports QT_QPA_PLATFORMTHEME=gtk3, under which Qt draws GTK's own
+    file dialog in-process and never asks the portal, so the user's chosen
+    file picker (set in xdg-desktop-portal's FileChooser preference) is
+    ignored. The portal theme opens that picker instead. On Omarchy the
+    palette comes from apply() below, not from the GTK theme, so nothing else
+    is lost. Must run before the QApplication is created; a theme the user
+    set explicitly is left alone.
+    """
+    if is_omarchy() and os.environ.get("QT_QPA_PLATFORMTHEME", "gtk3") == "gtk3":
+        os.environ["QT_QPA_PLATFORMTHEME"] = "xdgdesktopportal"
 
 
 def _load_colors() -> dict | None:
@@ -133,16 +149,111 @@ class _OmarchyStyle(QProxyStyle):
     def styleHint(self, hint, option=None, widget=None, returnData=None):
         if hint == QStyle.StyleHint.SH_DialogButtonBox_ButtonsHaveIcons:
             return 0
+        # GTK's order (Cancel before OK), as under the gtk3 platform theme;
+        # the portal theme would otherwise switch to Qt's generic layout (see
+        # prefer_portal_dialogs).
+        if hint == QStyle.StyleHint.SH_DialogButtonLayout:
+            return QDialogButtonBox.ButtonLayout.GnomeLayout.value
         return super().styleHint(hint, option, widget, returnData)
 
 
+_PORTAL = ("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop",
+           "org.freedesktop.portal.Settings")
+_INTERFACE_NS = "org.gnome.desktop.interface"
+
+
+def parse_font_name(value: str) -> QFont | None:
+    """A GTK font description ("Noto Sans 10") as a QFont, or None.
+
+    Only family and size are taken; style words ("Bold") stay in the family
+    name, which fontconfig resolves the same way GTK does.
+    """
+    family, _, size = value.strip().rpartition(" ")
+    try:
+        points = float(size)
+    except ValueError:
+        return None
+    if not family or points <= 0:
+        return None
+    font = QFont(family)
+    font.setPointSizeF(points)
+    return font
+
+
+class _DesktopInterface(QObject):
+    """Font and icon theme from the desktop's GTK settings, via the portal.
+
+    Under QT_QPA_PLATFORMTHEME=gtk3 Qt took these from GTK; the portal theme
+    (see prefer_portal_dialogs) doesn't, and would fall back to Qt's generic
+    "Sans Serif 9" and the hicolor icons. Reading the same keys from the
+    Settings portal keeps the app looking as before, live changes included
+    (`omarchy font set`, theme switches).
+    """
+
+    def __init__(self, app: QApplication):
+        super().__init__()
+        self._app = app
+        bus = QDBusConnection.sessionBus()
+        portal = QDBusInterface(*_PORTAL, bus)
+        for key in ("font-name", "icon-theme"):
+            reply = portal.call("ReadOne", _INTERFACE_NS, key)
+            if reply.type() == QDBusMessage.MessageType.ReplyMessage and reply.arguments():
+                self._apply(key, reply.arguments()[0])
+        bus.connect(_PORTAL[0], _PORTAL[1], _PORTAL[2], "SettingChanged", self._on_changed)
+
+    @pyqtSlot(QDBusMessage)
+    def _on_changed(self, message: QDBusMessage):
+        namespace, key, value = (message.arguments() + [None, None, None])[:3]
+        if namespace == _INTERFACE_NS:
+            self._apply(key, value)
+
+    def _apply(self, key: str, value):
+        value = getattr(value, "variant", lambda: value)()  # unwrap a QDBusVariant
+        if not isinstance(value, str) or not value:
+            return
+        if key == "font-name":
+            font = parse_font_name(value)
+            if font is not None:
+                self._app.setFont(font)
+        elif key == "icon-theme":
+            QIcon.setThemeName(value)
+
+
+class _ButtonLabels(QTranslator):
+    """OK and Cancel labelled from Monokular's own catalogues.
+
+    Under the gtk3 platform theme GTK supplied these, translated and with
+    mnemonics ("_Cancel"). The portal theme falls back to Qt's qtbase
+    catalogue, which ships only some of Monokular's languages and has no
+    mnemonics. Qt asks for them as ("QPlatformTheme", "OK"), so answering
+    that request covers dialog button boxes and message boxes alike.
+    """
+
+    def translate(self, context, source, disambiguation=None, n=-1):
+        if context == "QPlatformTheme":
+            if source == "OK":
+                return QCoreApplication.translate("StandardButtons", "&OK")
+            if source == "Cancel":
+                return QCoreApplication.translate("StandardButtons", "&Cancel")
+        # None, not "": an empty string would count as a translation and
+        # blank out every other text in the app.
+        return None
+
+
 _manager: OmarchyThemeManager | None = None
+_desktop: _DesktopInterface | None = None
+_button_labels: _ButtonLabels | None = None
 
 
 def apply(app: QApplication) -> OmarchyThemeManager | None:
     global _manager
     if not is_omarchy():
         return None
+    global _desktop, _button_labels
     app.setStyle(_OmarchyStyle("Fusion"))
+    if os.environ.get("QT_QPA_PLATFORMTHEME") == "xdgdesktopportal":
+        _desktop = _DesktopInterface(app)
+        _button_labels = _ButtonLabels(app)
+        app.installTranslator(_button_labels)
     _manager = OmarchyThemeManager(app)
     return _manager

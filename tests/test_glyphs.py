@@ -54,3 +54,11 @@ def test_omarchy_style_otherwise_behaves_like_fusion(qapp):
     fusion = QStyleFactory.create("Fusion")
     hint = QStyle.StyleHint.SH_ScrollBar_MiddleClickAbsolutePosition
     assert style.styleHint(hint) == fusion.styleHint(hint)
+
+
+def test_omarchy_style_orders_buttons_like_gtk(qapp):
+    from PyQt6.QtWidgets import QDialogButtonBox
+
+    style = omarchy_theme._OmarchyStyle("Fusion")
+    layout = style.styleHint(QStyle.StyleHint.SH_DialogButtonLayout)
+    assert layout == QDialogButtonBox.ButtonLayout.GnomeLayout.value
