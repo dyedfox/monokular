@@ -93,3 +93,18 @@ def test_every_other_text_is_left_to_the_normal_catalogues(button_labels):
     # An empty answer here would count as a translation and blank the UI.
     assert QCoreApplication.translate("MainWindow", "Open PDF") == "Open PDF"
     assert QCoreApplication.translate("QPlatformTheme", "Close") == "Close"
+
+
+def test_scrollbars_follow_the_theme_palette(qapp):
+    palette = omarchy_theme._build_palette({"foreground": "#102030", "accent": "#405060"})
+    qss = omarchy_theme._scrollbar_qss(palette)
+    assert "rgba(16, 32, 48, 0.28)" in qss  # idle handle: translucent text color
+    assert "rgba(64, 80, 96, 0.85)" in qss  # pressed handle: accent
+    assert "add-line, QScrollBar::sub-line { width: 0; height: 0;" in qss  # no arrows
+
+
+def test_outside_omarchy_no_stylesheet_is_set(qapp, monkeypatch):
+    monkeypatch.delenv("OMARCHY_PATH", raising=False)
+    before = qapp.styleSheet()
+    assert omarchy_theme.apply(qapp) is None
+    assert qapp.styleSheet() == before
